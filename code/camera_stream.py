@@ -2,10 +2,11 @@ import cv2
 import paho.mqtt.client as mqtt
 import json
 import base64
+from ultralytics import YOLO
 
 
 def preprocess_image(frame):
-    # Exemple simple de flip horizontal
+    # Exemple simple de flip horizontal (peut être adapté)
     return cv2.flip(frame, 1)
 
 
@@ -20,8 +21,21 @@ def publish_frame(client, topic, frame):
 
 
 def main():
-    # Initialisation de la capture vidéo (0 = caméra par défaut)
-    cap = cv2.VideoCapture(0)
+    # Charger le modèle YOLOv8 pré-entraîné
+    model = YOLO("yolov8n.pt")
+
+    # Pipeline CSI pour accéder à la caméra sur Nvidia Jetson
+    csi_pipeline = (
+        "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1280, height=720, framerate=30/1 ! "
+        "nvvidconv flip-method=0 ! video/x-raw, format=BGRx ! videoconvert ! appsink"
+    )
+
+    # Initialiser la capture vidéo CSI
+    cap = cv2.VideoCapture(csi_pipeline, cv2.CAP_GSTREAMER)
+
+    if not cap.isOpened():
+        print("Erreur : Impossible d'ouvrir le flux vidéo de la caméra CSI.")
+        return
 
     # Configuration MQTT
     client = mqtt.Client()
@@ -31,18 +45,37 @@ def main():
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
+            print("Erreur : Impossible de lire le flux vidéo.")
             break
 
-        # Prétraiter l'image avant publication
+        # Prétraiter l'image avant d'effectuer l'inférence
         processed_frame = preprocess_image(frame)
 
-        # Publier l'image prétraitée
-        publish_frame(client, "camera/images", processed_frame)
+        # Effectuer l'inférence YOLOv8
+        results = model(processed_frame)
 
-        # Attendre un court instant avant de publier la prochaine image
-        cv2.waitKey(100)  # 10 FPS
+        # Rechercher si un visage est détecté
+        faces_detected = False
+        for detection in results[0].boxes:
+            if detection.cls == 0:  # YOLO class '0' correspond généralement à "personne"
+                faces_detected = True
+                break
+
+        # Si un visage est détecté, publier l'image
+        if faces_detected:
+            print("Visage détecté, publication de l'image...")
+            publish_frame(client, "camera/images", processed_frame)
+
+        # Afficher les résultats annotés
+        annotated_frame = results[0].plot()
+        cv2.imshow("YOLOv8 CSI Camera Inference", annotated_frame)
+
+        # Quitter si 'q' est pressé
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
     cap.release()
+    cv2.destroyAllWindows()
     client.loop_stop()
     client.disconnect()
 

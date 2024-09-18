@@ -1,7 +1,7 @@
 # 1 - utilisateur scan RFID.
-# 1.1 - programme 'RFID Scan' retourne l'ID du tag de l'utilisateur.
-# 1.alt - programme 'RFID Scan' publie 'couleur rouge clignotante' sur le broker 'led/instruct'.
-
+#    1.1 - programme 'RFID Scan' retourne l'ID du tag de l'utilisateur sur le broker 'rfid/id'
+#    1.alt - programme 'RFID Scan' publie 'couleur rouge clignotante' sur le broker 'led/instruct'.
+import json
 import time
 import paho.mqtt.client as mqtt
 
@@ -14,16 +14,16 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(topic_to_sub)
 
 
-# Fonction pour publier un message sur un ou plusieurs topics
 def publish_message(client, topic, message):
+    """
+    Fonction pour publier un message sur un ou plusieurs topics
+    """
     client.publish(topic, message)
     print(f"Message publié sur {topic}: {message}")
 
 # Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
-
-
-def on_message(client, userdata, msg):
-    print("Message: ", msg)
+# def on_message(client, userdata, msg):
+#    print("Message: ", msg)
 
 
 def main():
@@ -46,7 +46,14 @@ def main():
         while True:
             now = time.time()
             if now - start > 10:
-                publish_message(client, "led/instruct", "Bonjour led/instruct")
+                message = {
+                    "color": "red",
+                    "behaviour": "blink"
+                }
+
+                message_json = json.dumps(message)
+                
+                publish_message(client, "led/instruct", message_json)
                 publish_message(client, "rfid/id", "234654723")
                 start = time.time()
 
