@@ -22,7 +22,7 @@ def publish_frame(client, topic, frame):
 
 def main():
     # Charger le modèle YOLOv8 pré-entraîné
-    model = YOLO("yolov8n.pt")
+    model = YOLO("../models/yolov8n-oiv7.pt", task='detect') 
 
     # Pipeline CSI pour accéder à la caméra sur Nvidia Jetson
     csi_pipeline = (

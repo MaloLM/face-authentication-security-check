@@ -79,6 +79,7 @@ def on_message(client, userdata, msg):
 
         # Vérifier si l'embedding correspond
         if check_embedding(frame):
+            print(True)
             print("Embedding correspondant trouvé.")
             # Si l'embedding correspond, arrêter
             client.unsubscribe("camera/images")
@@ -94,9 +95,9 @@ def on_message(client, userdata, msg):
             publish_message(client, "led/instruct", message_json)
 
         else:
-            print(f"Embedding non correspondant. Tentative {
-                  attempt_count + 1}/{MAX_ATTEMPTS}")
+            print(f"Embedding non correspondant. Tentative {attempt_count + 1}/{MAX_ATTEMPTS}")
             attempt_count += 1
+            print(attempt_count)
             if attempt_count < MAX_ATTEMPTS:
                 # Si l'embedding ne correspond pas et qu'il reste des tentatives, récupérer la nouvelle dernière image
                 fetch_last_retained_image(client)
