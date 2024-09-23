@@ -33,16 +33,16 @@ def publish_message(client, topic, message):
     Fonction pour publier un message sur un ou plusieurs topics
     """
     client.publish(topic, message)
-    print(f"Message publié sur {topic}: {message}")
+    # print(f"Message publié sur {topic}: {message}")
 
 
 def on_message(client, userdata, msg):
     """
     Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
     """
-    print("g ressu hein mesag: ", msg)
+    # print("g ressu hein mesag: ", msg)
     if msg.topic == 'rfid/id':
-        print(f"Message reçu sur le topic {msg.topic}: {msg.payload.decode()}")
+        # print(f"Message reçu sur le topic {msg.topic}: {msg.payload.decode()}")
 
         key = msg.payload.decode()
 
@@ -58,17 +58,27 @@ def on_message(client, userdata, msg):
 
             message_json = json.dumps(message)
 
-            print(f"Valeur trouvée pour la clé {key}: {value}")
-            publish_message(client, "camera/capture", message_json)
-        else:
-            print(f"La clé {key} n'existe pas dans le fichier JSON")
-            message = {
-                "color": "red",
-                "behaviour": "blink"
-            }
+            send_to_led_controller(client, "blue", "static", 1)
 
-            message_json = json.dumps(message)
-            publish_message(client, "led/instruct", message_json)
+            #print(f"Valeur trouvée pour la clé {key}: {value}")
+            publish_message(client, "camera/capture", message_json)
+
+            
+        else:
+            #print(f"La clé {key} n'existe pas dans le fichier JSON")
+            send_to_led_controller(client, "darkred", "blinking")
+          
+
+def send_to_led_controller(client, color: str, behavior: str, duration=None):
+    message = {
+        "color": color,
+        "behavior": behavior,
+        "duration": duration
+    }
+
+    message_json = json.dumps(message)
+    publish_message(client, "led/instruct", message_json)
+
 
 
 def main():

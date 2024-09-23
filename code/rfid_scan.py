@@ -19,7 +19,7 @@ def publish_message(client, topic, message):
     Fonction pour publier un message sur un ou plusieurs topics
     """
     client.publish(topic, message)
-    print(f"Message publié sur {topic}: {message}")
+    # print(f"Message publié sur {topic}: {message}")
 
 # Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
 # def on_message(client, userdata, msg):
@@ -47,8 +47,8 @@ def main():
             now = time.time()
             if now - start > 10:
                 message = {
-                    "color": "red",
-                    "behaviour": "blink"
+                    "color": "darkred",
+                    "behavior": "blinking"
                 }
 
                 message_json = json.dumps(message)
