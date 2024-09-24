@@ -3,20 +3,33 @@ import cv2
 import numpy as np
 import base64
 import paho.mqtt.client as mqtt
+import face_recognition
 import dlib
 
 # Nombre maximum de tentatives pour récupérer une nouvelle image
 MAX_ATTEMPTS = 5
 # Remplace avec ton modèle si besoin
-LANDMARK_MODEL_PATH = "shape_predictor_68_face_landmarks.dat"
+# LANDMARK_MODEL_PATH = "shape_predictor_68_face_landmarks.dat"
+file_path = '../../data/embeddings.json'
 
 # Initialisation du détecteur de landmarks de dlib
-detector = dlib.get_frontal_face_detector()
+# detector = dlib.get_frontal_face_detector()
 # predictor = dlib.shape_predictor(LANDMARK_MODEL_PATH)
 
 # Variables globales
 attempt_count = 0
 embeddings_id = None  # ID de l'embedding récupéré via 'camera/capture'
+
+def get_value_from_json(file_path, key):
+    # Ouvrir le fichier JSON
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # Vérifier si la clé existe
+    if key in data:
+        return data[key]  # Retourner la valeur associée à la clé
+    else:
+        return None  # Retourner None si la clé n'existe pas
 
 
 def on_connect(client, userdata, flags, rc):
@@ -37,18 +50,34 @@ def publish_message(client, topic, message, retain=False):
     print(f"Message publié sur {topic}: {message}")
 
 
-def check_embedding(embedding):
+def check_embedding(incomming_embedding, id_embeddings, emb_id):
     """
     Fonction qui vérifie si l'embedding correspond (toujours False pour l'instant)
     """
-    # Placeholder pour la logique réelle de matching des embeddings
-    # Comparaison des embeddings extraits avec ceux de l'ID reçu
-    # Ici, True ou False est renvoyé en fonction du matching des embeddings
-    if attempt_count >= 4:
-        return True
-    else:
-        return False
+    known_face_encodings = [id_embeddings] # dirty
+    known_face_names = [emb_id]
 
+    # Loop through each detected face and its encoding
+    for i, new_encoding in enumerate(incomming_embedding):
+        # Get the face location
+        top, right, bottom, left = face_locations[i]
+
+        # Compare with known faces
+        matches = face_recognition.compare_faces(known_face_encodings, new_encoding)
+        face_distances = face_recognition.face_distance(known_face_encodings, new_encoding)
+
+        # Find the best match
+        best_match_index = np.argmin(face_distances)
+        if matches[best_match_index]:
+            name = known_face_names[best_match_index]
+            print("predicted name", name, "vs real name", emb_id)
+            print("predicted name", type(name), "vs real name", type(emb_id))
+            if name == emb_id:
+                return True
+            else:
+                return False
+        else:
+            return False
 
 def extract_landmarks(image, bbox):
     """
@@ -83,9 +112,8 @@ def on_message(client, userdata, msg):
     """
     global attempt_count, embeddings_id
 
-    print("got a message")
-
     if msg.topic == "camera/capture":
+        print("got a capture notification")
         # Lorsqu'un message est reçu sur 'camera/capture', démarrer le processus
         data = json.loads(msg.payload.decode())
         embeddings_id = data['id']  # Récupérer l'ID et les embeddings
@@ -99,28 +127,26 @@ def on_message(client, userdata, msg):
         message = json.loads(msg.payload.decode())
         jpg_as_text = message["image"]
         bboxes = message["bboxes"]
-        print(bboxes, "/n")
+        
         # Vérifier si des bounding boxes sont présentes
         if len(bboxes) > 0:
             # Décodage de l'image base64
-
             jpg_original = base64.b64decode(jpg_as_text)
             nparr = np.frombuffer(jpg_original, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            #print("image recue")
-            #print(type(frame))
-            cv2.imshow("test", frame)
-            cv2.waitKey(1000)
+        
             # Sélectionner la plus grande bbox (le plus grand visage)
             largest_bbox = max(
                 bboxes, key=lambda bbox: bbox["width"] * bbox["height"])
 
-            # Extraire les landmarks du visage le plus grand
-            #landmarks = extract_landmarks(frame, largest_bbox)
-            #print(f"Landmarks extraits: {landmarks}")
+
+            face_locations = face_recognition.face_locations(image)
+            incomming_face_encodings = face_recognition.face_encodings(image, face_locations)
+
+            id_embeddings = get_value_from_json(file_path, embeddings_id)
 
             # Comparer l'embedding associé au visage (logique à ajouter)
-            if False:#check_embedding(landmarks):
+            if check_embedding(incomming_face_encodings, id_embeddings, embeddings_id):
                 print("Embedding correspondant trouvé.")
                 # Si l'embedding correspond, arrêter et notifier le contrôleur LED
                 client.unsubscribe("camera/images")
@@ -155,6 +181,7 @@ def on_message(client, userdata, msg):
                 }
                 publish_message(client, "led/instruct", json.dumps(message))
                 client.unsubscribe("camera/images")
+                attempt_count = 0
 
 
 def main():

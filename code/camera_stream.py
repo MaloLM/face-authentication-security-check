@@ -46,7 +46,7 @@ def detection_loop():
             img, width, height = camera.CaptureRGBA()
             
             # Exécuter la détection sur l'image capturée
-            detections = net.Detect(img, width, height)
+            detections = net.Detect(img, width, height, overlay="none")
             
             bboxes = []
             # Vérifier s'il y a des détections de visages

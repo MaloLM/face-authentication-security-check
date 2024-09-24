@@ -58,13 +58,11 @@ def on_message(client, userdata, msg):
 
             message_json = json.dumps(message)
 
-            send_to_led_controller(client, "blue", "static", 1)
+            send_to_led_controller(client, "blue", "static", 0.2)
 
-            # print(f"Valeur trouvée pour la clé {key}: {value}")
             publish_message(client, "camera/capture", message_json)
 
         else:
-            # print(f"La clé {key} n'existe pas dans le fichier JSON")
             send_to_led_controller(client, "darkred", "blinking")
 
 
