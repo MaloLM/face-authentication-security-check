@@ -45,15 +45,15 @@ def main():
         start = time.time()
         while True:
             now = time.time()
-            if now - start > 10:
-                message = {
-                    "color": "darkred",
-                    "behavior": "blinking"
-                }
+            if now - start > 30:
+                #message = {
+                #    "color": "darkred",
+                #    "behavior": "blinking"
+                #}
 
-                message_json = json.dumps(message)
+                #message_json = json.dumps(message)
                 
-                publish_message(client, "led/instruct", message_json)
+                #publish_message(client, "led/instruct", message_json)
                 publish_message(client, "rfid/id", "234654723")
                 start = time.time()
 

@@ -8,17 +8,17 @@ import dlib
 
 # Nombre maximum de tentatives pour récupérer une nouvelle image
 MAX_ATTEMPTS = 5
-# Remplace avec ton modèle si besoin
-# LANDMARK_MODEL_PATH = "shape_predictor_68_face_landmarks.dat"
-file_path = '../../data/embeddings.json'
+file_path = '../data/embeddings.json'
+capture = False
 
-# Initialisation du détecteur de landmarks de dlib
-# detector = dlib.get_frontal_face_detector()
-# predictor = dlib.shape_predictor(LANDMARK_MODEL_PATH)
+
+
+
 
 # Variables globales
 attempt_count = 0
 embeddings_id = None  # ID de l'embedding récupéré via 'camera/capture'
+
 
 def get_value_from_json(file_path, key):
     # Ouvrir le fichier JSON
@@ -55,12 +55,10 @@ def check_embedding(incomming_embedding, id_embeddings, emb_id):
     Fonction qui vérifie si l'embedding correspond (toujours False pour l'instant)
     """
     known_face_encodings = [id_embeddings] # dirty
-    known_face_names = [emb_id]
+    known_face_names = [emb_id] # dirty
 
     # Loop through each detected face and its encoding
     for i, new_encoding in enumerate(incomming_embedding):
-        # Get the face location
-        top, right, bottom, left = face_locations[i]
 
         # Compare with known faces
         matches = face_recognition.compare_faces(known_face_encodings, new_encoding)
@@ -68,10 +66,12 @@ def check_embedding(incomming_embedding, id_embeddings, emb_id):
 
         # Find the best match
         best_match_index = np.argmin(face_distances)
+        print(best_match_index)
+
         if matches[best_match_index]:
             name = known_face_names[best_match_index]
-            print("predicted name", name, "vs real name", emb_id)
-            print("predicted name", type(name), "vs real name", type(emb_id))
+            #print("predicted name", name, "vs real name", emb_id)
+            #print("predicted name", type(name), "vs real name", type(emb_id))
             if name == emb_id:
                 return True
             else:
@@ -105,24 +105,36 @@ def fetch_last_retained_image(client):
     # S'abonner temporairement pour recevoir le message retenu
     client.subscribe("camera/images")
 
+def is_image_bgr_or_rgb(image):
+    blue_channel = image[:,:,0]
+    green_channel = image[:,:,1]
+    red_channel = image[:,:,2]
+
+    blue_mean = np.mean(blue_channel)
+    red_mean = np.mean(red_channel)
+
+    if blue_mean > red_mean:
+        print("probalement BGR")
+    else:
+        print("probablement RGB")
 
 def on_message(client, userdata, msg):
     """
     Callback qui s'exécute lorsqu'un message est reçu sur un topic
     """
-    global attempt_count, embeddings_id
+    global attempt_count, embeddings_id, capture
 
     if msg.topic == "camera/capture":
         print("got a capture notification")
         # Lorsqu'un message est reçu sur 'camera/capture', démarrer le processus
         data = json.loads(msg.payload.decode())
         embeddings_id = data['id']  # Récupérer l'ID et les embeddings
-        print(f"ID reçu: {embeddings_id}")
+        # print(f"ID reçu: {embeddings_id}")
         attempt_count = 0
-
+        capture = True
         fetch_last_retained_image(client)
 
-    elif msg.topic == "camera/images":
+    elif msg.topic == "camera/images" and capture:
         # Réception de la dernière image retenue sur 'camera/images'
         message = json.loads(msg.payload.decode())
         jpg_as_text = message["image"]
@@ -134,16 +146,20 @@ def on_message(client, userdata, msg):
             jpg_original = base64.b64decode(jpg_as_text)
             nparr = np.frombuffer(jpg_original, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            is_image_bgr_or_rgb(frame)
         
             # Sélectionner la plus grande bbox (le plus grand visage)
             largest_bbox = max(
                 bboxes, key=lambda bbox: bbox["width"] * bbox["height"])
 
+            # print(frame.shape)
+            face_locations = face_recognition.face_locations(frame)
+            incomming_face_encodings = face_recognition.face_encodings(frame, face_locations)
 
-            face_locations = face_recognition.face_locations(image)
-            incomming_face_encodings = face_recognition.face_encodings(image, face_locations)
+            print(incomming_face_encodings)
 
             id_embeddings = get_value_from_json(file_path, embeddings_id)
+            # print(id_embeddings)
 
             # Comparer l'embedding associé au visage (logique à ajouter)
             if check_embedding(incomming_face_encodings, id_embeddings, embeddings_id):
@@ -155,6 +171,7 @@ def on_message(client, userdata, msg):
                     "behavior": "blinking"
                 }
                 publish_message(client, "led/instruct", json.dumps(message))
+                capture = False
 
             else:
                 print(f"Embedding non correspondant. Tentative {attempt_count + 1}/{MAX_ATTEMPTS}")
@@ -171,6 +188,8 @@ def on_message(client, userdata, msg):
                     publish_message(client, "led/instruct",
                                     json.dumps(message))
                     client.unsubscribe("camera/images")
+                    attempt_count = 0
+                    capture = False
         else:
             print("Aucune bounding box détectée dans l'image.")
             attempt_count += 1
@@ -182,6 +201,7 @@ def on_message(client, userdata, msg):
                 publish_message(client, "led/instruct", json.dumps(message))
                 client.unsubscribe("camera/images")
                 attempt_count = 0
+                capture = False
 
 
 def main():

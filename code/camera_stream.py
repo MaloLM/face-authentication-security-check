@@ -16,11 +16,13 @@ source = "csi://0"
 net = jetson_inference.detectNet("facedetect", threshold=0.4)
 camera = jetson_utils.gstCamera(1280, 720, source)
 
+
 # Fonction pour publier l'image et les bounding boxes via MQTT
 def publish_mqtt(image, bboxes):
     client = mqtt.Client()
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
     
+
     # Convertir l'image OpenCV en format JPEG
     _, buffer = cv2.imencode('.jpg', image)
     
@@ -35,7 +37,7 @@ def publish_mqtt(image, bboxes):
     
     # Publier le message sous forme de JSON sur le topic MQTT
     client.publish(MQTT_TOPIC, json.dumps(message), retain=True)
-    client.disconnect()
+    #client.disconnect()
 
 # Boucle principale de détection
 def detection_loop():
@@ -48,6 +50,7 @@ def detection_loop():
             # Exécuter la détection sur l'image capturée
             detections = net.Detect(img, width, height, overlay="none")
             
+
             bboxes = []
             # Vérifier s'il y a des détections de visages
             if len(detections) > 0:
