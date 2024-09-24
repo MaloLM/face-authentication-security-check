@@ -46,7 +46,7 @@ def on_message(client, userdata, msg):
 
         key = msg.payload.decode()
 
-        file_path = './embeddings.json'
+        file_path = '../data/embeddings.json'
 
         value = get_value_from_json(file_path, key)
 
@@ -60,14 +60,13 @@ def on_message(client, userdata, msg):
 
             send_to_led_controller(client, "blue", "static", 1)
 
-            #print(f"Valeur trouvée pour la clé {key}: {value}")
+            # print(f"Valeur trouvée pour la clé {key}: {value}")
             publish_message(client, "camera/capture", message_json)
 
-            
         else:
-            #print(f"La clé {key} n'existe pas dans le fichier JSON")
+            # print(f"La clé {key} n'existe pas dans le fichier JSON")
             send_to_led_controller(client, "darkred", "blinking")
-          
+
 
 def send_to_led_controller(client, color: str, behavior: str, duration=None):
     message = {
@@ -78,7 +77,6 @@ def send_to_led_controller(client, color: str, behavior: str, duration=None):
 
     message_json = json.dumps(message)
     publish_message(client, "led/instruct", message_json)
-
 
 
 def main():
