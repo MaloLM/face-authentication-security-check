@@ -8,7 +8,8 @@ display = jetson.utils.glDisplay()
 
 while display.IsOpen():
     img, width, height = camera.CaptureRGBA()
-    detections = net.Detect(img, width, height)
+    # valid overlays : box, labels, conf, none
+    detections = net.Detect(img, width, height, overlay="none")
 
     for detection in detections:
         print(int(detection.Width))
@@ -17,5 +18,4 @@ while display.IsOpen():
         print(int(detection.Center[1]))
 
     display.RenderOnce(img, width, height)
-    display.SetTitle(
-        "Object Detection | Network {:.0f} FPS".format(net.GetNetworkFPS()))
+    display.SetTitle("Object Detection | Network {:.0f} FPS".format(net.GetNetworkFPS()))
