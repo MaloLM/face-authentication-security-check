@@ -5,8 +5,17 @@ import face_recognition
 
 # load file
 
-image_path = '../../data/malmal.png'
-malmal = face_recognition.load_image_file(image_path)
+malmal_path = '../../data/malmal.png'
+malmal = face_recognition.load_image_file(malmal_path)
+
+biden_path = '../../data/biden.jpg'
+biden = face_recognition.load_image_file(biden_path)
+
+biden_path = '../../data/biden1.jpg'
+biden1 = face_recognition.load_image_file(biden_path)
+
+obama_path = '../../data/obama.jpg'
+obama = face_recognition.load_image_file(obama_path)
 
 # get face encodings
 
@@ -28,12 +37,17 @@ id = '234654723'
 
 malmal_encoding = get_value_from_json(file_path, id)
 
+
+face_locations = face_recognition.face_locations(biden1)
+biden_encodings = face_recognition.face_encodings(biden1)[0]
+
+
 # add to encoding database
 
-known_face_encodings = [malmal_encoding]
-known_face_names = ["Malmal"]
+known_face_encodings = [malmal_encoding, biden_encodings]
+known_face_names = ["Malmal", "Biden"]
 
-test_images = [malmal]
+test_images = [malmal, obama, biden]
 
 # compute face recognition
 
@@ -52,10 +66,8 @@ for image in test_images:
         top, right, bottom, left = face_locations[i]
 
         # Compare with known faces
-        matches = face_recognition.compare_faces(
-            known_face_encodings, new_encoding)
-        face_distances = face_recognition.face_distance(
-            known_face_encodings, new_encoding)
+        matches = face_recognition.compare_faces(known_face_encodings, new_encoding)
+        face_distances = face_recognition.face_distance(known_face_encodings, new_encoding)
 
         # Find the best match
         best_match_index = np.argmin(face_distances)
