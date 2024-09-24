@@ -52,7 +52,7 @@ def on_message(client, userdata, msg):
 
         if value:
             message = {
-                "key": key,
+                "id": key,
                 "embeddings": value
             }
 

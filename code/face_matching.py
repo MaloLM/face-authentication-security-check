@@ -12,7 +12,7 @@ LANDMARK_MODEL_PATH = "shape_predictor_68_face_landmarks.dat"
 
 # Initialisation du détecteur de landmarks de dlib
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(LANDMARK_MODEL_PATH)
+# predictor = dlib.shape_predictor(LANDMARK_MODEL_PATH)
 
 # Variables globales
 attempt_count = 0
@@ -44,7 +44,7 @@ def check_embedding(embedding):
     # Placeholder pour la logique réelle de matching des embeddings
     # Comparaison des embeddings extraits avec ceux de l'ID reçu
     # Ici, True ou False est renvoyé en fonction du matching des embeddings
-    if attempt_count == 4:
+    if attempt_count >= 4:
         return True
     else:
         return False
@@ -83,12 +83,15 @@ def on_message(client, userdata, msg):
     """
     global attempt_count, embeddings_id
 
+    print("got a message")
+
     if msg.topic == "camera/capture":
         # Lorsqu'un message est reçu sur 'camera/capture', démarrer le processus
         data = json.loads(msg.payload.decode())
         embeddings_id = data['id']  # Récupérer l'ID et les embeddings
         print(f"ID reçu: {embeddings_id}")
         attempt_count = 0
+
         fetch_last_retained_image(client)
 
     elif msg.topic == "camera/images":
@@ -96,36 +99,39 @@ def on_message(client, userdata, msg):
         message = json.loads(msg.payload.decode())
         jpg_as_text = message["image"]
         bboxes = message["bboxes"]
-
-        # Décodage de l'image base64
-        jpg_original = base64.b64decode(jpg_as_text)
-        nparr = np.frombuffer(jpg_original, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
+        print(bboxes, "/n")
         # Vérifier si des bounding boxes sont présentes
         if len(bboxes) > 0:
+            # Décodage de l'image base64
+
+            jpg_original = base64.b64decode(jpg_as_text)
+            nparr = np.frombuffer(jpg_original, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            #print("image recue")
+            #print(type(frame))
+            cv2.imshow("test", frame)
+            cv2.waitKey(1000)
             # Sélectionner la plus grande bbox (le plus grand visage)
             largest_bbox = max(
                 bboxes, key=lambda bbox: bbox["width"] * bbox["height"])
 
             # Extraire les landmarks du visage le plus grand
-            landmarks = extract_landmarks(frame, largest_bbox)
-            print(f"Landmarks extraits: {landmarks}")
+            #landmarks = extract_landmarks(frame, largest_bbox)
+            #print(f"Landmarks extraits: {landmarks}")
 
             # Comparer l'embedding associé au visage (logique à ajouter)
-            if check_embedding(landmarks):
+            if False:#check_embedding(landmarks):
                 print("Embedding correspondant trouvé.")
                 # Si l'embedding correspond, arrêter et notifier le contrôleur LED
                 client.unsubscribe("camera/images")
                 message = {
                     "color": "green",
-                    "behaviour": "blink"
+                    "behavior": "blinking"
                 }
                 publish_message(client, "led/instruct", json.dumps(message))
 
             else:
-                print(f"Embedding non correspondant. Tentative {
-                      attempt_count + 1}/{MAX_ATTEMPTS}")
+                print(f"Embedding non correspondant. Tentative {attempt_count + 1}/{MAX_ATTEMPTS}")
                 attempt_count += 1
                 if attempt_count < MAX_ATTEMPTS:
                     # Si l'embedding ne correspond pas, récupérer la nouvelle dernière image
@@ -133,8 +139,8 @@ def on_message(client, userdata, msg):
                 else:
                     print("Nombre maximum de tentatives atteint. Embedding non trouvé.")
                     message = {
-                        "color": "red",
-                        "behaviour": "blink"
+                        "color": "darkred",
+                        "behavior": "blinking"
                     }
                     publish_message(client, "led/instruct",
                                     json.dumps(message))
@@ -144,8 +150,8 @@ def on_message(client, userdata, msg):
             attempt_count += 1
             if attempt_count >= MAX_ATTEMPTS:
                 message = {
-                    "color": "red",
-                    "behaviour": "blink"
+                    "color": "yellow",
+                    "behavior": "blinking"
                 }
                 publish_message(client, "led/instruct", json.dumps(message))
                 client.unsubscribe("camera/images")
