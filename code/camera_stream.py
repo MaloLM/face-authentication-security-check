@@ -1,64 +1,79 @@
-import paho.mqtt.client as mqtt
-import base64
 import json
 import cv2
-import numpy as np
-import jetson_inference
+import base64
 import jetson_utils
+import jetson_inference
+import paho.mqtt.client as mqtt
 
-# Configuration MQTT
+# MQTT configuration
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 MQTT_TOPIC = "camera/images"
 
-# Initialisation du réseau de détection et de la caméra
-source = "csi://0"
-net = jetson_inference.detectNet("facedetect", threshold=0.4)
-camera = jetson_utils.gstCamera(1280, 720, source)
+# Camera and detection network init
+CSI_SOURCE = "csi://0"
+net = jetson_inference.detectNet("facedetect", threshold=0.5)
+camera = jetson_utils.gstCamera(1280, 720, CSI_SOURCE)
 
 
-# Fonction pour publier l'image et les bounding boxes via MQTT
-def publish_mqtt(image, bboxes):
+def publish_message(image, bboxes):
+    """
+    Publishes an image and associated bounding boxes to a specified MQTT topic.
+
+    Args:
+        image (numpy.ndarray): The image captured by the camera in OpenCV format (BGR).
+        bboxes (list): A list of bounding boxes where each box is represented as a dictionary 
+                       containing 'left', 'top', 'width', 'height', 'center_x', and 'center_y'.
+
+    The image is first encoded in JPEG format and then base64 encoded before being published
+    to the MQTT broker under the topic defined by `MQTT_TOPIC`.
+    """
     client = mqtt.Client()
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    
 
-    # Convertir l'image OpenCV en format JPEG
+    # Convert OenCV image to jpeg
     _, buffer = cv2.imencode('.jpg', image)
-    
-    # Encoder l'image en base64
     image_base64 = base64.b64encode(buffer).decode('utf-8')
-    
-    # Créer une structure JSON avec l'image et les bounding boxes
+
     message = {
         "image": image_base64,
         "bboxes": bboxes
     }
-    
-    # Publier le message sous forme de JSON sur le topic MQTT
+
     client.publish(MQTT_TOPIC, json.dumps(message), retain=True)
-    #client.disconnect()
+    # client.disconnect()  # ???
 
-# Boucle principale de détection
-def detection_loop():
+
+def are_faces_detected(detections):
+    """
+    Checks if any faces were detected in the current frame.
+
+    Args:
+        detections (list): A list of detection objects returned by the detection network.
+
+    Returns:
+        bool: True if one or more faces are detected, False otherwise.
+    """
+    return True if len(detections) > 0 else False
+
+
+def main():
     try:
-        i = 0
-        while True:  # Boucle infinie avec KeyboardInterrupt pour l'arrêter
-            # Capture de l'image avec la caméra CSI
-            img, width, height = camera.CaptureRGBA()
-            
-            # Exécuter la détection sur l'image capturée
-            detections = net.Detect(img, width, height, overlay="none")
-            
+        nb_publish = 0
+        while True:
 
-            bboxes = []
-            # Vérifier s'il y a des détections de visages
-            if len(detections) > 0:
-                # Convertir l'image RGBA Jetson en format compatible avec OpenCV (BGR)
-                img_bgr = jetson_utils.cudaToNumpy(img, width, height, 4)  # Convertir en tableau NumPy
-                img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_RGBA2BGR)  # Convertir RGBA -> BGR
-                
-                # Parcourir les détections et extraire les bounding boxes
+            img, width, height = camera.CaptureRGBA()
+
+            detections = net.Detect(img, width, height, overlay="none")
+
+            if are_faces_detected(detections):
+                # Convert RGBA image to OpenCV compatible (BGR)
+                img_bgr = jetson_utils.cudaToNumpy(img, width, height, 4)
+
+                img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_RGBA2BGR)
+
+                # Go through detections and extract bounding boxes properties
+                bboxes = []
                 for detection in detections:
                     bbox = {
                         "left": int(detection.Left),
@@ -70,15 +85,14 @@ def detection_loop():
                     }
                     bboxes.append(bbox)
 
-                # Publier l'image et les bounding boxes via MQTT
-                publish_mqtt(img_bgr, bboxes)
-                i += 1
-                # print(f"published message {i} with bboxes")
+                publish_message(img_bgr, bboxes)
+                nb_publish += 1
+
                 print("published message {:.0f} with bboxes".format(i))
-    
+
     except KeyboardInterrupt:
         print("Interruption clavier détectée. Fermeture du programme.")
 
-# Fonction principale
+
 if __name__ == "__main__":
-    detection_loop()
+    main()

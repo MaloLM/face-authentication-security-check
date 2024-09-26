@@ -1,64 +1,61 @@
-# 1 - utilisateur scan RFID.
-#    1.1 - programme 'RFID Scan' retourne l'ID du tag de l'utilisateur sur le broker 'rfid/id'
-#    1.alt - programme 'RFID Scan' publie 'couleur rouge clignotante' sur le broker 'led/instruct'.
-import json
 import time
 import paho.mqtt.client as mqtt
 
+MQTT_PUB_TOPIC = "rfid/id"
+TMP_IDEA = '234654723'  # tmp ID while RFID Scan is not implemented
+TMP_TIMER = 25  # seconds
+
 
 def on_connect(client, userdata, flags, rc):
-    print(f"Connecté au broker avec le code de résultat {rc}")
+    """
+    Callback function triggered when the MQTT client connects to the broker.
 
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        userdata: User-defined data passed when setting the callback.
+        flags: Response flags sent by the broker.
+        rc (int): Connection result code (0 means success).
+
+    Prints the connection result and subscribes to the relevant topics, if any.
+    """
     topic_to_sub = []
     if len(topic_to_sub) > 0:
         client.subscribe(topic_to_sub)
 
+    print("Connect to broker with code: {:.0f}".format(rc))
+
 
 def publish_message(client, topic, message):
     """
-    Fonction pour publier un message sur un ou plusieurs topics
+    Publishes a message to a specified MQTT topic.
+
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        topic (str): The MQTT topic where the message will be published.
+        message (str): The message to be published, in string format.
     """
     client.publish(topic, message)
-    # print(f"Message publié sur {topic}: {message}")
-
-# Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
-# def on_message(client, userdata, msg):
-#    print("Message: ", msg)
 
 
 def main():
 
     client = mqtt.Client()
 
-    # Attacher les callbacks
     client.on_connect = on_connect
-    # client.on_message = on_message
 
-    # Connexion au broker
     client.connect("localhost", 1883, 60)
 
-    # Lancer la boucle réseau dans un thread séparé
     client.loop_start()
 
-    # Garder le programme en vie pour écouter les messages
     try:
         start = time.time()
         while True:
             now = time.time()
-            if now - start > 30:
-                #message = {
-                #    "color": "darkred",
-                #    "behavior": "blinking"
-                #}
-
-                #message_json = json.dumps(message)
-                
-                #publish_message(client, "led/instruct", message_json)
-                publish_message(client, "rfid/id", "234654723")
+            if now - start > TMP_TIMER:
+                publish_message(client, MQTT_PUB_TOPIC, TMP_IDEA)  # tmp
                 start = time.time()
 
     except KeyboardInterrupt:
-        # Arrêter la boucle et déconnecter proprement
         client.loop_stop()
         client.disconnect()
 

@@ -1,18 +1,21 @@
 import time
+import json
 from blinkstick import blinkstick
 import paho.mqtt.client as mqtt
-
 
 
 def set_static(bstick, color_name: str):
     bstick.set_color(name=color_name)
 
+
 def set_blinking(bstick, color_name, nb_blink=8):
-    bstick.blink(channel=0, index=0, name=color_name, repeats=nb_blink, delay = 150)
+    bstick.blink(channel=0, index=0, name=color_name,
+                 repeats=nb_blink, delay=150)
 
 
 def set_pulse(bstick, color_name):
     raise NotImplementedError
+
 
 def on_connect(client, userdata, flags, rc):
     """
@@ -27,7 +30,7 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     """
-    Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
+    Callback function when a message is received for a subbed topic.
     """
     global my_bstick
     global behaviors
@@ -36,14 +39,12 @@ def on_message(client, userdata, msg):
 
     key = msg.payload.decode()
 
-
     message = {
         "key": key,
         "embeddings": value
     }
 
     message_json = json.dumps(message)
-
 
     if ("color", "behavior") in message_json.keys():
         color = message_json['color']
@@ -61,13 +62,11 @@ def on_message(client, userdata, msg):
         print("('color', 'behavior') n'est pas dans les clés du message")
 
 
-
-
 my_bstick = blinkstick.find_first()
 
 behaviors = {
     'static': set_static,
-    'blinking' : set_blinking,
+    'blinking': set_blinking,
     'pulse': set_pulse
 }
 
@@ -76,17 +75,13 @@ def main():
 
     client = mqtt.Client()
 
-    # Attacher les callbacks
     client.on_connect = on_connect
     client.on_message = on_message
 
-    # Connexion au broker
     client.connect("localhost", 1883, 60)
 
-    # Lancer la boucle réseau dans un thread séparé
     client.loop_start()
 
-    # Garder le programme en vie pour écouter les messages
     try:
         while True:
             set_static(my_bstick, "darkred")
@@ -101,4 +96,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

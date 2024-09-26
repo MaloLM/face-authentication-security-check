@@ -1,72 +1,89 @@
-# 2 - programme 'DB Check' récupère l'ID sur le broker, vérifie que l'ID est l'une des clés du fichier JSON.
-#   2.1 - l'ID correspond a une clé du fichier JSON -> le programme 'DB Check' publie l'ID sur le broker 'camera/capture'.
-#   2.alt - l'ID ne correspond pas a une clé du fichier JSON -> le programme 'DB Check' publie 'couleur rouge clignotante' sur le broker 'led/instruct'.
 import json
 import paho.mqtt.client as mqtt
+from utils import get_value_from_json
 
-
-def get_value_from_json(file_path, key):
-    # Ouvrir le fichier JSON
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
-    # Vérifier si la clé existe
-    if key in data:
-        return data[key]  # Retourner la valeur associée à la clé
-    else:
-        return None  # Retourner None si la clé n'existe pas
+MQTT_SUB_TOPIC = "rfid/id"
 
 
 def on_connect(client, userdata, flags, rc):
     """
-    Callback qui s'exécute lorsque le client se connecte au broker
-    """
-    print(f"Connecté au broker avec le code de résultat {rc}")
+    Callback function triggered when the MQTT client connects to the broker.
 
-    topic_to_sub = [("rfid/id", 0), ("topic/test2", 0)]
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        userdata: User-defined data passed when setting the callback.
+        flags: Response flags sent by the broker.
+        rc (int): Connection result. 0 indicates success.
+
+    Subscribes the client to the `MQTT_SUB_TOPIC` upon successful connection and prints the result code.
+    """
+    topic_to_sub = [(MQTT_SUB_TOPIC, 0)]
+
     if len(topic_to_sub) > 0:
         client.subscribe(topic_to_sub)
+
+    print("Connect to broker with code: {:.0f}".format(rc))
 
 
 def publish_message(client, topic, message):
     """
-    Fonction pour publier un message sur un ou plusieurs topics
+    Publishes a given message to a specified MQTT topic.
+
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        topic (str): The MQTT topic to publish to.
+        message (str): The message to publish, usually in JSON format.
     """
     client.publish(topic, message)
-    # print(f"Message publié sur {topic}: {message}")
 
 
 def on_message(client, userdata, msg):
     """
-    Fonction Callback qui s'exécute lorsqu'un message est reçu sur un topic
+    Callback function triggered when a message is received on a subscribed topic.
+
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        userdata: User-defined data passed when setting the callback.
+        msg (paho.mqtt.client.MQTTMessage): The received MQTT message containing the payload and topic.
+
+    Retrieves a value from a JSON file using the received message payload (as the key) and publishes the
+    corresponding value if found. Additionally, sends instructions to an LED controller based on the result.
     """
-    # print("g ressu hein mesag: ", msg)
-    if msg.topic == 'rfid/id':
-        # print(f"Message reçu sur le topic {msg.topic}: {msg.payload.decode()}")
+    # if msg.topic == 'MQTT_SUB_TOPIC':
+    key = msg.payload.decode()
 
-        key = msg.payload.decode()
+    file_path = '../data/embeddings.json'
 
-        file_path = '../data/embeddings.json'
+    value = get_value_from_json(file_path, key)
 
-        value = get_value_from_json(file_path, key)
+    if value:
+        message = {
+            "id": key,
+            "embeddings": value
+        }
 
-        if value:
-            message = {
-                "id": key,
-                "embeddings": value
-            }
+        message_json = json.dumps(message)
 
-            message_json = json.dumps(message)
+        send_to_led_controller(client, "blue", "static", 0.2)
 
-            send_to_led_controller(client, "blue", "static", 0.2)
+        publish_message(client, "camera/capture", message_json)
 
-            publish_message(client, "camera/capture", message_json)
-
-        else:
-            send_to_led_controller(client, "darkred", "blinking")
+    else:
+        send_to_led_controller(client, "darkred", "blinking")
 
 
 def send_to_led_controller(client, color: str, behavior: str, duration=None):
+    """
+    Sends a control message to the LED controller over MQTT.
+
+    Args:
+        client (paho.mqtt.client.Client): The MQTT client instance.
+        color (str): The color to display on the LED (e.g., 'blue', 'darkred').
+        behavior (str): The LED behavior (e.g., 'static', 'blinking').
+        duration (float, optional): Duration for the LED action (used if behavior is 'static'). Default is None.
+
+    Publishes a message to the "led/instruct" topic, instructing the LED client to change color and behavior.
+    """
     message = {
         "color": color,
         "behavior": behavior,
@@ -81,23 +98,18 @@ def main():
 
     client = mqtt.Client()
 
-    # Attacher les callbacks
     client.on_connect = on_connect
     client.on_message = on_message
 
-    # Connexion au broker
     client.connect("localhost", 1883, 60)
 
-    # Lancer la boucle réseau dans un thread séparé
     client.loop_start()
 
-    # Garder le programme en vie pour écouter les messages
     try:
         while True:
             pass
 
     except KeyboardInterrupt:
-        # Arrêter la boucle et déconnecter proprement
         client.loop_stop()
         client.disconnect()
 

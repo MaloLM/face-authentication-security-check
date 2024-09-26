@@ -1,0 +1,5 @@
+- [] : au fait, il faut mieux extraire la plus grande bbox (s'il y en a plusieurs sur l'image) au niveau de caméra stream puisque il y a deja une propriété de bbox (area il me semble) qui détermine la surface respective des bboxes. Ca évite de faire le calcul.
+  - Ou alors envoyer la propriété area et déterminer en fonction de ca, c'est peut etre mieux en terme de séparation des responsabilités. Je peux meme envoyer toutes les propriétés, qui peut le plus peut le moins, tant que ca ne dérange pas les performances.
+- [] : toujours dans caméra stream, je converti l'image en RGBA -> BGR, puis ensuite j'envoie l'image sur le broker, est ce vraiment ce que l'on souhaite pour face recognition ? vraie question
+- [] : Pour camera stream/publish_mqtt() : N'il y a t'il pas moyen plus efficient de transmettre l'image ? possible de stoquer directement en ndarray ?
+- [] : Pour camera stream/publish_mqtt() : client.disconnect() # ??? est ce mieux quand j'active la déctionnection après publication du message ? avant de partir a Paris, j'avais désactivé la déconnection

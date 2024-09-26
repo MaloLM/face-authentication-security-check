@@ -1,2 +1,10 @@
-jupyter-server>=2.4.0
-jupyterlab
+jetson_utils
+jetson_inference
+paho
+cv2
+numpy
+face_recognition
+blinkstick
+matplotlib
+Jetson_MFRC522
+spidev
